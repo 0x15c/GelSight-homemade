@@ -85,6 +85,7 @@ class Remove_marker:
 
         if returnInterpolatedImage:
             # conduct linear interpolation to rebuild image
+            # @TODO: using dense interpolation data may be time-consuming, try Monte Carlo instead.
             b_val = self.b[self.o_mask]
             self.b_new = scipy.interpolate.griddata(o_coordinates,b_val,(rgrid,cgrid),method='linear').astype(np.uint8)
             g_val = self.g[self.o_mask]
@@ -150,8 +151,8 @@ def generate_ball_mask(img_ball, center, radius):
 class Img_preprocess:
     def __init__(self, im_ref, im_ball):
         im_diff = diff_image(im_ref, im_ball) # generate the difference image
-        c,r = find_center_manually(im_diff) # manually find center and radius
-        ball_mask = generate_ball_mask(im_diff, c, r) # use center and radius to generate ball mask
+        self.c,self.r = find_center_manually(im_diff) # manually find center and radius
+        ball_mask = generate_ball_mask(im_diff, self.c, self.r) # use center and radius to generate ball mask
         grey_im = cv.cvtColor(im_diff,cv.COLOR_BGR2GRAY) 
         masked = cv.bitwise_and(grey_im,grey_im,mask=ball_mask) # generate masked img
         _,self.mask = cv.threshold(masked,115,255,cv.THRESH_BINARY) # generate the final mask
@@ -165,26 +166,41 @@ class Calib_param:
 
 class Gradient():
 
-    def __init__(self, image, mask=None):
+    def __init__(self, center, Radius, image, mask=None):
+        # split b, g, r channel of image
+        b = image[:,:,0]
+        g = image[:,:,1]
+        r = image[:,:,2]
+
         # if there exists mask, first extracts the masked coordinates
         if mask is None:
             pass
         # @TODO: need implementation here
         else:
             mask_binary = mask.astype(bool)
-            pixCoord = np.stack(np.where(mask_binary==True),axis=1)
+            self.pixCoord = np.stack(np.where(mask_binary==True),axis=1)
+            self.surfNorm(self.pixCoord,center,Radius)
+            pass
+
+
+    def surfNorm(self, pixCoord, center, Radius):
+        pixCoord[:,0] = pixCoord[:,0]-center[1]
+        pixCoord[:,1] = pixCoord[:,1]-center[0]
+        grad = np.zeros_like(pixCoord)
+        for i in pixCoord:
+            gi = self.G(i[0],i[1],Radius)
+            grad[i]=gi
             pass
 
 
 
-
-    def G(x, y, R): # Grad
+    def G(self,x,y,R): # Grad 2D
         r = lambda x,y: np.sqrt(x**2 + y**2)
         Dx = lambda x,y,R: -x/np.sqrt(R**2-r(x,y)**2)
         Dy = lambda x,y,R: -y/np.sqrt(R**2-r(x,y)**2)
-        return np.array([Dx(x,y,R),Dy(x,y,R),1])
-    def N(): #Norm
-        return lambda x,y,R: np.array([x/R, y/R, np.sqrt(R**2-x**2-y**2)/R])
+        return np.array([Dx(x,y,R),Dy(x,y,R)])
+    def N(self,x,y,R): # Norm 3D
+        return np.array([x/R, y/R, np.sqrt(R**2-x**2-y**2)/R])
 
 
 
@@ -192,6 +208,6 @@ if __name__ == '__main__':
     im = cv.imread('nomarker_ref.jpg')
     im_ball = cv.imread('test_data/sample_8.jpg')
     img = Img_preprocess(im, im_ball)
-    Grad = Gradient(im,img.mask)
+    Grad = Gradient(img.c,img.r,im_ball,img.mask)
     cv.imshow('mask2',img.masked_img)
     cv.waitKey(0)
