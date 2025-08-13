@@ -74,7 +74,7 @@ class Remove_marker:
         # self.b_new = scipy.interpolate.griddata(b_coordinates,b_val,(rgrid,cgrid),method='cubic').astype(np.uint8)
         canvas = np.ones_like(image)
         for item in centroids:
-            r, c = int(item[1]), int(item[0])
+            r, c = int(item[1]), int(item[0]) # row and column
             # mask can be any shape, choose one match the marker shape
             # cv.circle(canvas, (r,c), 8,(0,0,0),-1)
             cv.ellipse(canvas, (r,c), (10,7),0,0,360,(0,0,0),-1)
@@ -162,7 +162,7 @@ class Calib_param:
     def __init__(self, BallRad, mm2Pixel):
         self.ballrad = BallRad
         self.mm2pixel = mm2Pixel
-        self.ballradPix = BallRad / mm2Pixel
+        self.ballradPix = BallRad * mm2Pixel
 
 class Gradient():
 
@@ -177,20 +177,35 @@ class Gradient():
             pass
         # @TODO: need implementation here
         else:
+            
             mask_binary = mask.astype(bool)
-            self.pixCoord = np.stack(np.where(mask_binary==True),axis=1)
-            self.surfNorm(self.pixCoord,center,Radius)
-            pass
+            bval=b[mask_binary]
+            gval=g[mask_binary]
+            rval=r[mask_binary]
+            self.pixCoord = np.stack(np.where(mask_binary),axis=1)
+            self.grad, self.angle = self.surfNorm(self.pixCoord,center,Radius)
+            ''' LUT is short for lookup table.
+                It is a 5-tuple ordered in structure of:
+                ----------------------------------------
+                | blue | green | red | Grad_x | Grad_y |
+                ----------------------------------------
+            '''
+            self.lut = np.stack((bval,gval,rval,self.grad[:,0],self.grad[:,1]),axis=1)
+
 
 
     def surfNorm(self, pixCoord, center, Radius):
-        pixCoord[:,0] = pixCoord[:,0]-center[1]
-        pixCoord[:,1] = pixCoord[:,1]-center[0]
-        grad = np.zeros_like(pixCoord)
+        pixCoord[:,0] = pixCoord[:,0]-center[1] # pixCoord: row|cv: y
+        pixCoord[:,1] = pixCoord[:,1]-center[0] # pixCoord: col|cv: x
+        # pixCoord is in (row, col) form
+        grad = np.zeros_like(pixCoord).astype(np.float64)
+        angle = np.zeros_like(pixCoord).astype(np.float64)
         for i in pixCoord:
-            gi = self.G(i[0],i[1],Radius)
+            gi = self.G(i[1],i[0],Radius) # change (r,c) to (x,y) form for ith coord
+            ai = self.A(i[1],i[0],Radius)
             grad[i]=gi
-            pass
+            angle[i]=ai
+        return grad, angle
 
 
 
@@ -201,13 +216,17 @@ class Gradient():
         return np.array([Dx(x,y,R),Dy(x,y,R)])
     def N(self,x,y,R): # Norm 3D
         return np.array([x/R, y/R, np.sqrt(R**2-x**2-y**2)/R])
+    def A(self,x,y,R): # Angle representation, in (theta, phi) form
+        r = lambda x,y: np.sqrt(x**2 + y**2)
+        return np.array([np.arctan2(y,x), np.arccos(r(x,y)/R)])
 
 
 
 if __name__ == '__main__':
+    param = Calib_param(7.6/2,1/0.10577)
     im = cv.imread('nomarker_ref.jpg')
     im_ball = cv.imread('test_data/sample_8.jpg')
     img = Img_preprocess(im, im_ball)
-    Grad = Gradient(img.c,img.r,im_ball,img.mask)
+    Grad = Gradient(img.c,param.ballradPix,im_ball,img.mask)
     cv.imshow('mask2',img.masked_img)
     cv.waitKey(0)
