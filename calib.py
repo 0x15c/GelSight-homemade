@@ -1,7 +1,9 @@
 import cv2 as cv
 import numpy as np
 import scipy.interpolate
+import csv
 from sklearn.cluster import DBSCAN
+import pandas as pd
 
 # this function takes extracted cluster info as input, calculates centroids with intensity
 def centroids_calc(cluster_array):
@@ -171,6 +173,10 @@ class Gradient():
         b = image[:,:,0]
         g = image[:,:,1]
         r = image[:,:,2]
+        hsv = cv.cvtColor(image,cv.COLOR_BGR2HSV)
+        h = hsv[:,:,0]
+        s = hsv[:,:,1]
+        v = hsv[:,:,2]
 
         # if there exists mask, first extracts the masked coordinates
         if mask is None:
@@ -182,6 +188,9 @@ class Gradient():
             bval=b[mask_binary]
             gval=g[mask_binary]
             rval=r[mask_binary]
+            hval=h[mask_binary]
+            sval=s[mask_binary]
+            vval=v[mask_binary]
             self.pixCoord = np.stack(np.where(mask_binary),axis=1)
             self.grad, self.angle = self.surfNorm(self.pixCoord,center,Radius)
             ''' LUT is short for lookup table.
@@ -190,7 +199,9 @@ class Gradient():
                 | blue | green | red | Grad_x | Grad_y |
                 ----------------------------------------
             '''
-            self.lut = np.stack((bval,gval,rval,self.grad[:,0],self.grad[:,1]),axis=1)
+            self.lut = np.stack((
+                bval,gval,rval,hval,sval,vval,self.grad[:,0],self.grad[:,1],self.angle[:,0],self.angle[:,1]
+                ),axis=1)
 
 
 
@@ -200,11 +211,11 @@ class Gradient():
         # pixCoord is in (row, col) form
         grad = np.zeros_like(pixCoord).astype(np.float64)
         angle = np.zeros_like(pixCoord).astype(np.float64)
-        for i in pixCoord:
+        for idx, i in enumerate(pixCoord):
             gi = self.G(i[1],i[0],Radius) # change (r,c) to (x,y) form for ith coord
             ai = self.A(i[1],i[0],Radius)
-            grad[i]=gi
-            angle[i]=ai
+            grad[idx]=gi
+            angle[idx]=ai
         return grad, angle
 
 
@@ -220,6 +231,13 @@ class Gradient():
         r = lambda x,y: np.sqrt(x**2 + y**2)
         return np.array([np.arctan2(y,x), np.arccos(r(x,y)/R)])
 
+# write to csv
+def lut_write(lut):
+    with open('LUT.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        for row in lut:
+            writer.writerow(row)
+    
 
 
 if __name__ == '__main__':
@@ -230,3 +248,8 @@ if __name__ == '__main__':
     Grad = Gradient(img.c,param.ballradPix,im_ball,img.mask)
     cv.imshow('mask2',img.masked_img)
     cv.waitKey(0)
+    # lut_write(Grad.lut)
+    col_name=['b','g','r','h','s','v','Gx','Gy','theta','phi']
+    df = pd.DataFrame(Grad.lut, columns=col_name)
+    
+    df.to_csv('lut.csv', index=False,float_format='%.3f')
