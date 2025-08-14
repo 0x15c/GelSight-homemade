@@ -1,3 +1,4 @@
 *.jpg
 .vscode
 test_data
+*.csv
