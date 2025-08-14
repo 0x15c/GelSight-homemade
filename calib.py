@@ -4,6 +4,7 @@ import scipy.interpolate
 import csv
 from sklearn.cluster import DBSCAN
 import pandas as pd
+import glob
 
 # this function takes extracted cluster info as input, calculates centroids with intensity
 def centroids_calc(cluster_array):
@@ -49,7 +50,7 @@ class Remove_marker:
     # takes ref image as input, 3 channels
     # constructs referance array
     # workflow: filter out markers
-    def __init__(self,image,returnInterpolatedImage=False):
+    def __init__(self,image,generateInterpolatedImage=False,MC_interp=False):
         grey_image = cv.cvtColor(image,cv.COLOR_BGR2GRAY)
         self.empty_mask = np.zeros_like(image[:,:,0])
         self.row, self.col = np.shape(self.empty_mask)
@@ -85,16 +86,28 @@ class Remove_marker:
         o_indices = np.where(self.o_mask)
         o_coordinates = np.stack(o_indices, axis=1)
 
-        if returnInterpolatedImage:
+        if generateInterpolatedImage:
             # conduct linear interpolation to rebuild image
             # @TODO: using dense interpolation data may be time-consuming, try Monte Carlo instead.
             b_val = self.b[self.o_mask]
-            self.b_new = scipy.interpolate.griddata(o_coordinates,b_val,(rgrid,cgrid),method='linear').astype(np.uint8)
             g_val = self.g[self.o_mask]
-            self.g_new = scipy.interpolate.griddata(o_coordinates,g_val,(rgrid,cgrid),method='linear').astype(np.uint8)
             r_val = self.r[self.o_mask]
-            self.r_new = scipy.interpolate.griddata(o_coordinates,r_val,(rgrid,cgrid),method='linear').astype(np.uint8)
-
+            # Monte Carlo sampling
+            if MC_interp == True:
+                sc = 1000 # sampling count
+                n = o_coordinates.shape[0]
+                idx = np.random.choice(n, size=sc, replace=False)
+                o_coordinates_mc = o_coordinates[idx]
+                b_val_mc = b_val[idx]
+                g_val_mc = g_val[idx]
+                r_val_mc = r_val[idx]
+                self.b_new = scipy.interpolate.griddata(o_coordinates_mc,b_val_mc,(rgrid,cgrid),method='linear').astype(np.uint8)
+                self.g_new = scipy.interpolate.griddata(o_coordinates_mc,g_val_mc,(rgrid,cgrid),method='linear').astype(np.uint8)
+                self.r_new = scipy.interpolate.griddata(o_coordinates_mc,r_val_mc,(rgrid,cgrid),method='linear').astype(np.uint8)
+            else:
+                self.b_new = scipy.interpolate.griddata(o_coordinates,b_val,(rgrid,cgrid),method='linear').astype(np.uint8)
+                self.g_new = scipy.interpolate.griddata(o_coordinates,g_val,(rgrid,cgrid),method='linear').astype(np.uint8)
+                self.r_new = scipy.interpolate.griddata(o_coordinates,r_val,(rgrid,cgrid),method='linear').astype(np.uint8)
             # masks
             self.mask = self.mask.astype(np.uint8)*255 # this mask is derived by adaptive thresholding
             self.mask_circle = (canvas*255).astype(np.uint8) # this mask is used for making holes
@@ -103,11 +116,6 @@ class Remove_marker:
             self.bgr = np.stack((self.b_new,self.g_new,self.r_new),axis=2)
             self.bgr = cv.GaussianBlur(self.bgr,(5,5),5,None,5)
         
-# class Remove_marker_with_ball(Remove_marker):
-#     def __init__(self, image):
-#         # first, detect the location of ball
-
-#         super().__init__(image, returnInterpolatedImage=False)
 def diff_image(img_ref, img):
     img_ref = img_ref.astype(np.int16)
     img = img.astype(np.int16)
@@ -173,7 +181,7 @@ class Gradient():
         b = image[:,:,0]
         g = image[:,:,1]
         r = image[:,:,2]
-        hsv = cv.cvtColor(image,cv.COLOR_BGR2HSV)
+        hsv = cv.cvtColor(image,cv.COLOR_BGR2HSV_FULL)
         h = hsv[:,:,0]
         s = hsv[:,:,1]
         v = hsv[:,:,2]
@@ -194,10 +202,8 @@ class Gradient():
             self.pixCoord = np.stack(np.where(mask_binary),axis=1)
             self.grad, self.angle = self.surfNorm(self.pixCoord,center,Radius)
             ''' LUT is short for lookup table.
-                It is a 5-tuple ordered in structure of:
-                ----------------------------------------
-                | blue | green | red | Grad_x | Grad_y |
-                ----------------------------------------
+                It is a 10-tuple ordered in structure of:
+                blue green red hue sat val gradx grady anglex angley
             '''
             self.lut = np.stack((
                 bval,gval,rval,hval,sval,vval,self.grad[:,0],self.grad[:,1],self.angle[:,0],self.angle[:,1]
@@ -237,19 +243,35 @@ def lut_write(lut):
         writer = csv.writer(f)
         for row in lut:
             writer.writerow(row)
-    
 
+# wrap angle to [0, 2Pi)
+def wrap_2Pi(theta):
+    return np.mod(theta, 2*np.pi)
 
 if __name__ == '__main__':
     param = Calib_param(7.6/2,1/0.10577)
-    im = cv.imread('nomarker_ref.jpg')
-    im_ball = cv.imread('test_data/sample_8.jpg')
-    img = Img_preprocess(im, im_ball)
-    Grad = Gradient(img.c,param.ballradPix,im_ball,img.mask)
-    cv.imshow('mask2',img.masked_img)
-    cv.waitKey(0)
+    ref = cv.imread('nomarker_ref.jpg')
+    # im_ball = cv.imread('test_data/sample_8.jpg')
+    # img_remove_background = diff_image(ref,im_ball)
+    calib_img_file_list = sorted(glob.glob("test_data/sample_*.jpg"))
+    print(calib_img_file_list)
+    img_obj_list = []
+    Grad_data_list = []
+    for filepath in calib_img_file_list:
+        img = cv.imread(filepath)
+        img_remove_background = diff_image(ref,img)
+        img_processed = Img_preprocess(ref, img)
+        Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img_remove_background, img_processed.mask))
+        cv.imshow('masked result',img_processed.masked_img)
+        # cv.waitKey(0)
+    # img = Img_preprocess(im, im_ball)
+    # Grad = Gradient(img.c,param.ballradPix,img_remove_background,img.mask)
+    # cv.imshow('mask2',img.masked_img)
+    # cv.waitKey(0)
     # lut_write(Grad.lut)
     col_name=['b','g','r','h','s','v','Gx','Gy','theta','phi']
-    df = pd.DataFrame(Grad.lut, columns=col_name)
-    
-    df.to_csv('lut.csv', index=False,float_format='%.3f')
+    df = pd.DataFrame(columns=col_name) # make title
+    df.to_csv('lut.csv', index=False)
+    for item in Grad_data_list:
+        df = pd.DataFrame(item.lut)
+        df.to_csv('lut.csv', mode='a',header=False,index=False,float_format='%.3f')
