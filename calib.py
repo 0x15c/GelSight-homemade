@@ -116,14 +116,18 @@ class Remove_marker:
             self.bgr = np.stack((self.b_new,self.g_new,self.r_new),axis=2)
             self.bgr = cv.GaussianBlur(self.bgr,(5,5),5,None,5)
         
-def diff_image(img_ref, img):
+def diff_image(img_ref, img, visible=True): # visible option determines whether regulate the image to [0, 255] range after differentiation
     img_ref = img_ref.astype(np.int16)
     img = img.astype(np.int16)
     img_diff = img - img_ref
     max, min = np.max(img_diff), np.min(img_diff)
     img_diff_visible = ((img_diff - min)/(max - min)*255).astype(np.uint8)
+    # regulating on img_diff, making out-of-range values overflow, thus can be masked out in later operation
+    img_diff[img_diff<0] = 0
+    img_diff[img_diff>255] = 0
 
-    return img_diff_visible
+    return img_diff_visible if visible == True else img_diff
+
 def find_center_manually(img_ball,init_center=None,init_radius=None):
     key=-1
     if init_center is None:
@@ -136,7 +140,7 @@ def find_center_manually(img_ball,init_center=None,init_radius=None):
         r=init_radius
     
     while key!=27: #ESC
-        im2show = cv.circle(np.array(img_ball),c,r,(0,255,0),2) # creates a new instance of img_ball
+        im2show = cv.circle(np.array(img_ball),c,r,(0,0,255),1) # creates a new instance of img_ball
         cv.imshow('contact image manually adjust',im2show)
         key=cv.waitKey(0)
         if key == 119: # W
@@ -160,12 +164,30 @@ def generate_ball_mask(img_ball, center, radius):
 
 class Img_preprocess:
     def __init__(self, im_ref, im_ball):
-        im_diff = diff_image(im_ref, im_ball) # generate the difference image
-        self.c,self.r = find_center_manually(im_diff) # manually find center and radius
+        marker_dection_mask = 115 #115
+        im_diff = diff_image(im_ref, im_ball,visible=True) # generate the difference image, notice the image is shifted to visible range
+        grey_im = cv.cvtColor(im_diff,cv.COLOR_BGR2GRAY)
+        # detect circle
+        sat_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,1]
+        # grey_mask = cv.adaptiveThreshold(grey_im,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,11,2).astype(bool)
+        # grey_mask_invert = ~grey_mask
+        # sat_im[grey_mask_invert] = np.average(sat_im[grey_mask])
+        cv.imshow('saturation-image',sat_im)
+        circles = cv.HoughCircles(sat_im, cv.HOUGH_GRADIENT, 1, 20,
+                           param1=50, param2=30, minRadius=10, maxRadius=30)
+        biggest=[0,0,0]
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            for i in circles[0,:]:
+                if biggest[2] < i[2]:
+                    biggest = i
+                # find the biggest circle
+            self.c,self.r = find_center_manually(im_diff,(biggest[0],biggest[1]),biggest[2])
+        else:
+            self.c,self.r = find_center_manually(im_diff) # manually find center and radius
         ball_mask = generate_ball_mask(im_diff, self.c, self.r) # use center and radius to generate ball mask
-        grey_im = cv.cvtColor(im_diff,cv.COLOR_BGR2GRAY) 
         masked = cv.bitwise_and(grey_im,grey_im,mask=ball_mask) # generate masked img
-        _,self.mask = cv.threshold(masked,115,255,cv.THRESH_BINARY) # generate the final mask
+        _,self.mask = cv.threshold(masked,marker_dection_mask,255,cv.THRESH_BINARY) # generate the final mask
         self.masked_img = cv.bitwise_and(im_ball,im_ball,mask=self.mask)
 
 class Calib_param:
@@ -253,15 +275,15 @@ if __name__ == '__main__':
     ref = cv.imread('nomarker_ref.jpg')
     # im_ball = cv.imread('test_data/sample_8.jpg')
     # img_remove_background = diff_image(ref,im_ball)
-    calib_img_file_list = sorted(glob.glob("test_data/sample_*.jpg"))
+    calib_img_file_list = sorted(glob.glob("test_data_new/sample_*.jpg"))
     print(calib_img_file_list)
     img_obj_list = []
     Grad_data_list = []
     for filepath in calib_img_file_list:
         img = cv.imread(filepath)
-        img_remove_background = diff_image(ref,img)
+        img_remove_background = diff_image(ref,img,visible=False)
         img_processed = Img_preprocess(ref, img)
-        Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img_remove_background, img_processed.mask))
+        Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img, img_processed.mask))
         cv.imshow('masked result',img_processed.masked_img)
         # cv.waitKey(0)
     # img = Img_preprocess(im, im_ball)
@@ -270,8 +292,9 @@ if __name__ == '__main__':
     # cv.waitKey(0)
     # lut_write(Grad.lut)
     col_name=['b','g','r','h','s','v','Gx','Gy','theta','phi']
+    lut_file_name = 'lut_test.csv'
     df = pd.DataFrame(columns=col_name) # make title
-    df.to_csv('lut.csv', index=False)
+    df.to_csv(lut_file_name, index=False)
     for item in Grad_data_list:
         df = pd.DataFrame(item.lut)
-        df.to_csv('lut.csv', mode='a',header=False,index=False,float_format='%.3f')
+        df.to_csv(lut_file_name, mode='a',header=False,index=False,float_format='%.3f')
