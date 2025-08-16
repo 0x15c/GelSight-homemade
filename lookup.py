@@ -1,10 +1,32 @@
 import numpy as np
 import cv2 as cv
+from scipy.fft import fft2, ifft2
+
+def poisson_reconstruct(p,q):
+
+    # divergence = dp/dx + dq/dy
+    dpdx = np.gradient(p, axis=1)
+    dqdy = np.gradient(q, axis=0)
+    f = dpdx + dqdy
+
+    H, W = f.shape
+    fy, fx = np.meshgrid(np.fft.fftfreq(H), np.fft.fftfreq(W), indexing="ij")
+
+    denom = (2*np.pi*1j*fx)**2 + (2*np.pi*1j*fy)**2
+    denom[0,0] = 1  # avoid div/0 for DC component
+
+    F = fft2(f)
+    Z = np.real(ifft2(F / denom))
+
+    # normalize depth
+    Z -= Z.min()
+    Z /= Z.max()
+    return Z
 
 num_bins = 64
 
 bg = cv.imread('nomarker_ref.jpg').astype(np.int16)
-img = cv.imread('test_data/reconstruct_4.jpg').astype(np.int16)
+img = cv.imread('test_data/reconstruct_6.jpg').astype(np.int16)
 im_diff = img - bg
 
 b_l = (im_diff[:,:,0]+255)//(512//num_bins)
@@ -17,6 +39,14 @@ Grad_im = fancyTable[b_l, g_l, r_l,:]
 
 GradX = Grad_im[:,:,0]
 GradY = Grad_im[:,:,1]
+
+Z = poisson_reconstruct(GradX, GradY)
+
+Z_reg = (Z*255).astype(np.uint8)
+
+heatmap = cv.applyColorMap(Z_reg, cv.COLORMAP_JET)
+
+cv.imshow('heatmap',heatmap)
 
 GradX_im = ((GradX - np.min(GradX))/(np.max(GradX)-np.min(GradX))*255).astype(np.uint8)
 GradY_im = ((GradY - np.min(GradY))/(np.max(GradY)-np.min(GradY))*255).astype(np.uint8)
