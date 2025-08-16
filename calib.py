@@ -66,8 +66,7 @@ class Remove_marker:
         cspace = np.linspace(0,self.col-1,self.col).astype(np.uint32)
         cgrid, rgrid = np.meshgrid(cspace,rspace)
 
-        self.mask = cv.adaptiveThreshold(grey_image,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,15,2).astype(bool)
-
+        self.mask = cv.adaptiveThreshold(grey_image,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,5,2).astype(bool)
         o_indices = np.where(self.mask==False)
         o_coordinates = np.stack(o_indices, axis=1)
 
@@ -79,9 +78,10 @@ class Remove_marker:
         for item in centroids:
             r, c = int(item[1]), int(item[0]) # row and column
             # mask can be any shape, choose one match the marker shape
-            # cv.circle(canvas, (r,c), 8,(0,0,0),-1)
-            cv.ellipse(canvas, (r,c), (10,7),0,0,360,(0,0,0),-1)
+            cv.circle(canvas, (r,c), 15,(0,0,0),-1)
+            # cv.ellipse(canvas, (r,c), (10,7),0,0,360,(0,0,0),-1)
         self.o_mask = canvas[:,:,0].astype(bool)
+        cv.imshow('canvas',canvas*255)
 
         o_indices = np.where(self.o_mask)
         o_coordinates = np.stack(o_indices, axis=1)
@@ -123,9 +123,10 @@ def diff_image(img_ref, img, visible=True): # visible option determines whether 
     max, min = np.max(img_diff), np.min(img_diff)
     img_diff_visible = ((img_diff - min)/(max - min)*255).astype(np.uint8)
     # regulating on img_diff, making out-of-range values overflow, thus can be masked out in later operation
-    img_diff[img_diff<0] = 0
-    img_diff[img_diff>255] = 0
+    # img_diff = img_diff + 80
 
+    # # img_diff[img_diff>255] = 0
+    # img_diff = img_diff.astype(np.uint8)
     return img_diff_visible if visible == True else img_diff
 
 def find_center_manually(img_ball,init_center=None,init_radius=None):
@@ -133,21 +134,21 @@ def find_center_manually(img_ball,init_center=None,init_radius=None):
     if init_center is None:
         c=[img_ball.shape[1]//2,img_ball.shape[0]//2]
     else:
-        c=init_center
+        c=np.copy(init_center)
     if init_radius is None:
         r=10
     else:
-        r=init_radius
+        r=init_radius.astype(np.int16)
     
     while key!=27: #ESC
         im2show = cv.circle(np.array(img_ball),c,r,(0,0,255),1) # creates a new instance of img_ball
         cv.imshow('contact image manually adjust',im2show)
         key=cv.waitKey(0)
-        if key == 119: # W
+        if key == 119:   # W
             c[1] -= 1
         elif key == 115: # S
             c[1] += 1
-        elif key == 97: # A
+        elif key == 97:  # A
             c[0] -= 1
         elif key == 100: # D
             c[0] += 1
@@ -167,12 +168,14 @@ class Img_preprocess:
         marker_dection_mask = 115 #115
         im_diff = diff_image(im_ref, im_ball,visible=True) # generate the difference image, notice the image is shifted to visible range
         grey_im = cv.cvtColor(im_diff,cv.COLOR_BGR2GRAY)
-        # detect circle
+        # detect circle, you can choose whether sat or val is applied to find a circle
         sat_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,1]
+        val_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,2]
+        # _, val_im = cv.threshold(val_im,130,255,cv.THRESH_BINARY)
         # grey_mask = cv.adaptiveThreshold(grey_im,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,11,2).astype(bool)
         # grey_mask_invert = ~grey_mask
         # sat_im[grey_mask_invert] = np.average(sat_im[grey_mask])
-        cv.imshow('saturation-image',sat_im)
+        cv.imshow('image for circle detection',sat_im)
         circles = cv.HoughCircles(sat_im, cv.HOUGH_GRADIENT, 1, 20,
                            param1=50, param2=30, minRadius=10, maxRadius=30)
         biggest=[0,0,0]
@@ -203,10 +206,10 @@ class Gradient():
         b = image[:,:,0]
         g = image[:,:,1]
         r = image[:,:,2]
-        hsv = cv.cvtColor(image,cv.COLOR_BGR2HSV_FULL)
-        h = hsv[:,:,0]
-        s = hsv[:,:,1]
-        v = hsv[:,:,2]
+        # hsv = cv.cvtColor(image,cv.COLOR_BGR2HSV_FULL)
+        # h = hsv[:,:,0]
+        # s = hsv[:,:,1]
+        # v = hsv[:,:,2]
 
         # if there exists mask, first extracts the masked coordinates
         if mask is None:
@@ -218,9 +221,9 @@ class Gradient():
             bval=b[mask_binary]
             gval=g[mask_binary]
             rval=r[mask_binary]
-            hval=h[mask_binary]
-            sval=s[mask_binary]
-            vval=v[mask_binary]
+            # hval=h[mask_binary]
+            # sval=s[mask_binary]
+            # vval=v[mask_binary]
             self.pixCoord = np.stack(np.where(mask_binary),axis=1)
             self.grad, self.angle = self.surfNorm(self.pixCoord,center,Radius)
             ''' LUT is short for lookup table.
@@ -228,7 +231,7 @@ class Gradient():
                 blue green red hue sat val gradx grady anglex angley
             '''
             self.lut = np.stack((
-                bval,gval,rval,hval,sval,vval,self.grad[:,0],self.grad[:,1],self.angle[:,0],self.angle[:,1]
+                bval,gval,rval,self.grad[:,0],self.grad[:,1],self.angle[:,0],self.angle[:,1]
                 ),axis=1)
 
 
@@ -270,12 +273,66 @@ def lut_write(lut):
 def wrap_2Pi(theta):
     return np.mod(theta, 2*np.pi)
 
+def bin_table(grad_data_list, num_bins = 64):
+    # This function takes the computed gradient data,
+    # returns a binned and sorted table
+    table = grad_data_list[0].lut
+    for item in grad_data_list[1:]:
+        table = np.concat([table,item.lut])
+    # table only contains b, g, r, Gx and Gy
+    table = table[:,:-2]
+    edges = np.linspace(-256, 255, num_bins+1)
+    # 0-based index
+    b_idx = np.digitize(table[:,0], bins=edges) - 1  # b
+    g_idx = np.digitize(table[:,1], bins=edges) - 1  # g
+    r_idx = np.digitize(table[:,2], bins=edges) - 1  # r
+    # Clip to ensure indices stay in [0, num_bins-1]
+    b_idx = np.clip(b_idx, 0, num_bins-1)
+    g_idx = np.clip(g_idx, 0, num_bins-1)
+    r_idx = np.clip(r_idx, 0, num_bins-1)
+    datatype = [('b', np.int16),('g', np.int16),('r', np.int16),('Gx',np.float64),('Gy',np.float64)]
+    rawTable = np.zeros(len(table[:,0]), dtype=datatype)
+    rawTable['b']  = b_idx
+    rawTable['g']  = g_idx
+    rawTable['r']  = r_idx
+    rawTable['Gx'] = table[:,3]
+    rawTable['Gy'] = table[:,4]
+    data_sorted = np.sort(rawTable,order=['b','g','r'])
+    # deal with collision in lookup table: take average
+    keys = np.stack([rawTable['b'], rawTable['g'], rawTable['r']], axis=1)
+    uniq_keys, inv = np.unique(keys, axis=0, return_inverse=True)
+    # prepare output structured array
+    datatype = [('b', np.int16), ('g', np.int16), ('r', np.int16),
+                ('Gx', np.float64), ('Gy', np.float64)]
+    uniqTable = np.zeros(len(uniq_keys), dtype=datatype)
+
+    # fill key fields
+    uniqTable['b'] = uniq_keys[:,0]
+    uniqTable['g'] = uniq_keys[:,1]
+    uniqTable['r'] = uniq_keys[:,2]
+
+    # average Gx and Gy for each group
+    for i in range(len(uniq_keys)):
+        mask = (inv == i)
+        uniqTable['Gx'][i] = rawTable['Gx'][mask].mean()
+        uniqTable['Gy'][i] = rawTable['Gy'][mask].mean()
+    fancyTable = np.zeros((num_bins, num_bins, num_bins, 2), dtype=np.float64)
+
+    # fill with a default value (like 0 or np.nan) for missing bins
+    # fancyTable is the binned and sorted table, it is constructed like an cubic array
+    # usage: given img_binned = (b, g, r),
+    # apply Grad_img = fancyTable[b, g, r, :] to get a looked array.
+    # this indexing is super fast.
+    fancyTable.fill(0)
+    fancyTable[uniqTable['b'],uniqTable['g'],uniqTable['r'],0]=uniqTable['Gx']
+    fancyTable[uniqTable['b'],uniqTable['g'],uniqTable['r'],1]=uniqTable['Gy']
+    return fancyTable
 if __name__ == '__main__':
     param = Calib_param(7.6/2,1/0.10577)
     ref = cv.imread('nomarker_ref.jpg')
     # im_ball = cv.imread('test_data/sample_8.jpg')
     # img_remove_background = diff_image(ref,im_ball)
-    calib_img_file_list = sorted(glob.glob("test_data_new/sample_*.jpg"))
+    calib_img_file_list = sorted(glob.glob("test_data/sample_*.jpg"))
     print(calib_img_file_list)
     img_obj_list = []
     Grad_data_list = []
@@ -283,18 +340,20 @@ if __name__ == '__main__':
         img = cv.imread(filepath)
         img_remove_background = diff_image(ref,img,visible=False)
         img_processed = Img_preprocess(ref, img)
-        Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img, img_processed.mask))
-        cv.imshow('masked result',img_processed.masked_img)
+        Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img_remove_background, img_processed.mask))
+        # cv.imshow('img_remove_background',img_remove_background)
         # cv.waitKey(0)
     # img = Img_preprocess(im, im_ball)
     # Grad = Gradient(img.c,param.ballradPix,img_remove_background,img.mask)
     # cv.imshow('mask2',img.masked_img)
     # cv.waitKey(0)
     # lut_write(Grad.lut)
-    col_name=['b','g','r','h','s','v','Gx','Gy','theta','phi']
-    lut_file_name = 'lut_test.csv'
-    df = pd.DataFrame(columns=col_name) # make title
-    df.to_csv(lut_file_name, index=False)
-    for item in Grad_data_list:
-        df = pd.DataFrame(item.lut)
-        df.to_csv(lut_file_name, mode='a',header=False,index=False,float_format='%.3f')
+    # col_name=['b','g','r','Gx','Gy','theta','phi']
+    # lut_file_name = 'lut_test0.csv'
+    # df = pd.DataFrame(columns=col_name) # make title
+    # df.to_csv(lut_file_name, index=False)
+    # for item in Grad_data_list:
+    #     df = pd.DataFrame(item.lut)
+    #     df.to_csv(lut_file_name, mode='a',header=False,index=False,float_format='%.3f')
+    fancyTable = bin_table(Grad_data_list)
+    np.save('lookuptable',fancyTable)
