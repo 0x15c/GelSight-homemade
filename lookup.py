@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
 from scipy.fft import fft2, ifft2
+import pyvista as pv
 
 def poisson_reconstruct(p,q):
 
@@ -19,15 +20,17 @@ def poisson_reconstruct(p,q):
     Z = np.real(ifft2(F / denom))
 
     # normalize depth
-    Z -= Z.min()
-    Z /= Z.max()
+    # Z -= Z.min()
+    # Z /= Z.max()
     return Z
 
 num_bins = 64
 
 bg = cv.imread('nomarker_ref.jpg').astype(np.int16)
-img = cv.imread('test_data/reconstruct_6.jpg').astype(np.int16)
+img = cv.imread('test_data/sample_8.jpg').astype(np.int16)
 im_diff = img - bg
+
+H, W, _ = img.shape
 
 b_l = (im_diff[:,:,0]+255)//(512//num_bins)
 g_l = (im_diff[:,:,1]+255)//(512//num_bins)
@@ -40,13 +43,24 @@ Grad_im = fancyTable[b_l, g_l, r_l,:]
 GradX = Grad_im[:,:,0]
 GradY = Grad_im[:,:,1]
 
+y_idx, x_idx = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+X = x_idx
+Y = y_idx
 Z = poisson_reconstruct(GradX, GradY)
 
-Z_reg = (Z*255).astype(np.uint8)
 
-heatmap = cv.applyColorMap(Z_reg, cv.COLORMAP_JET)
+points = np.stack((X,Y,Z),axis=-1).reshape(-1, 3)
 
-cv.imshow('heatmap',heatmap)
+cloud = pv.PolyData(points)
+cloud.plot(point_size=5)
+surf = cloud.delaunay_2d()
+surf.plot(show_edges=True)
+
+# Z_reg = (Z*255).astype(np.uint8)
+
+# heatmap = cv.applyColorMap(Z_reg, cv.COLORMAP_JET)
+
+# cv.imshow('heatmap',heatmap)
 
 GradX_im = ((GradX - np.min(GradX))/(np.max(GradX)-np.min(GradX))*255).astype(np.uint8)
 GradY_im = ((GradY - np.min(GradY))/(np.max(GradY)-np.min(GradY))*255).astype(np.uint8)
