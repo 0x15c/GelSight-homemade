@@ -1,6 +1,8 @@
 # GelSight-homemade
 A homemade version of MIT gelsight, with classic gradient reconstruction
 
+image source: [gelsight_heightmap_reconstruction](https://github.com/siyuandong16/gelsight_heightmap_reconstruction)
+
 ## How to use it
 First, clone this repo and install required packages:
 ```
