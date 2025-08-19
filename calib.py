@@ -165,19 +165,20 @@ def generate_ball_mask(img_ball, center, radius):
 
 class Img_preprocess:
     def __init__(self, im_ref, im_ball):
-        marker_dection_mask = 115 #115
+        marker_dection_mask = 0 #115
         im_diff = diff_image(im_ref, im_ball,visible=True) # generate the difference image, notice the image is shifted to visible range
         grey_im = cv.cvtColor(im_diff,cv.COLOR_BGR2GRAY)
         # detect circle, you can choose whether sat or val is applied to find a circle
+        # hue_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,0]
         sat_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,1]
-        val_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,2]
+        # val_im = (cv.cvtColor(im_diff,cv.COLOR_BGR2HSV))[:,:,2]
         # _, val_im = cv.threshold(val_im,130,255,cv.THRESH_BINARY)
         # grey_mask = cv.adaptiveThreshold(grey_im,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,11,2).astype(bool)
         # grey_mask_invert = ~grey_mask
         # sat_im[grey_mask_invert] = np.average(sat_im[grey_mask])
-        cv.imshow('image for circle detection',sat_im)
+        # cv.imshow('image for circle detection',sat_im)
         circles = cv.HoughCircles(sat_im, cv.HOUGH_GRADIENT, 1, 20,
-                           param1=50, param2=30, minRadius=10, maxRadius=30)
+                           param1=50, param2=30, minRadius=10, maxRadius=40)
         biggest=[0,0,0]
         if circles is not None:
             circles = np.uint16(np.around(circles))
@@ -328,11 +329,11 @@ def bin_table(grad_data_list, num_bins = 64):
     fancyTable[uniqTable['b'],uniqTable['g'],uniqTable['r'],1]=uniqTable['Gy']
     return fancyTable
 if __name__ == '__main__':
-    param = Calib_param(7.6/2,1/0.10577)
-    ref = cv.imread('nomarker_ref.jpg')
+    param = Calib_param(10.0/2,640/34)
+    ref = cv.imread('calib_08182025/background.jpg')
     # im_ball = cv.imread('test_data/sample_8.jpg')
     # img_remove_background = diff_image(ref,im_ball)
-    calib_img_file_list = sorted(glob.glob("test_data/sample_*.jpg"))
+    calib_img_file_list = sorted(glob.glob("calib_08182025/cropped_*.jpg"))
     print(calib_img_file_list)
     img_obj_list = []
     Grad_data_list = []
@@ -340,6 +341,7 @@ if __name__ == '__main__':
         img = cv.imread(filepath)
         img_remove_background = diff_image(ref,img,visible=False)
         img_processed = Img_preprocess(ref, img)
+        cv.imshow('masked_image',img_processed.masked_img)
         Grad_data_list.append(Gradient(img_processed.c, param.ballradPix, img_remove_background, img_processed.mask))
         # cv.imshow('img_remove_background',img_remove_background)
         # cv.waitKey(0)
@@ -356,4 +358,4 @@ if __name__ == '__main__':
     #     df = pd.DataFrame(item.lut)
     #     df.to_csv(lut_file_name, mode='a',header=False,index=False,float_format='%.3f')
     fancyTable = bin_table(Grad_data_list)
-    np.save('lookuptable',fancyTable)
+    np.save('lut_0818',fancyTable)

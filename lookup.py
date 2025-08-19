@@ -2,6 +2,7 @@ import numpy as np
 import cv2 as cv
 from scipy.fft import fft2, ifft2
 import pyvista as pv
+import pandas as pd
 
 def poisson_reconstruct(p,q):
 
@@ -26,8 +27,8 @@ def poisson_reconstruct(p,q):
 
 num_bins = 64
 
-bg = cv.imread('nomarker_ref.jpg').astype(np.int16)
-img = cv.imread('test_data/sample_8.jpg').astype(np.int16)
+bg = cv.imread('calib_08182025/background.jpg').astype(np.int16)
+img = cv.imread('reconstruct/1.jpg').astype(np.int16)
 im_diff = img - bg
 
 H, W, _ = img.shape
@@ -36,7 +37,7 @@ b_l = (im_diff[:,:,0]+255)//(512//num_bins)
 g_l = (im_diff[:,:,1]+255)//(512//num_bins)
 r_l = (im_diff[:,:,2]+255)//(512//num_bins)
 
-fancyTable=np.load('lookuptable.npy')
+fancyTable=np.load('lut_0818.npy')
 
 Grad_im = fancyTable[b_l, g_l, r_l,:]
 
@@ -52,7 +53,7 @@ Z = poisson_reconstruct(GradX, GradY)
 points = np.stack((X,Y,Z),axis=-1).reshape(-1, 3)
 
 cloud = pv.PolyData(points)
-cloud.plot(point_size=5)
+# cloud.plot(point_size=5)
 surf = cloud.delaunay_2d()
 surf.plot(show_edges=True)
 
@@ -70,6 +71,10 @@ img_red = np.stack([np.zeros_like(GradY_im),np.zeros_like(GradY_im),GradY_im],ax
 img_blue = np.stack([GradX_im,np.zeros_like(GradX_im),np.zeros_like(GradX_im)],axis=2)
 
 img = np.concat([img_red,img_blue],axis=0)
+
+grad_stats = np.stack([GradX.flatten(),GradY.flatten()],axis=1)
+df = pd.DataFrame(grad_stats)
+df.to_csv('grad_stats.csv',float_format='%.3f')
 
 cv.imshow('img',img)
 cv.waitKey(0)
