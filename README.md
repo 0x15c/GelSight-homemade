@@ -12,6 +12,8 @@ pip install -r requirements.txt
 ```
 Then run `calib.py` , place the ball, and apply indent force to produce images for sensor calibration. This calibration process will produce a `.npz` lookup table, with specified geometry parameters of the sensor(i.e. `mm2Pixel`) and the ball(i.e. its radius). This script would ask user for manually circle search, with (`W`, `A`, `S` and `D`) to adjust the location of center and (`M` and `N`) to increase/decrease the radius of lookup circle. Once circle search is finished, the pixels within the circle range will be extracted in (R, G, B) pair and assigned to a gradient value evaluated from geometry parameters.
 
+
+You can run `lookup.py` to display the constructed surface, provided the lookup table, the background image and the image you want to extract depth from are presented. You can run `depth_camera_demo.py` to see the depth reconstruction in real time, but please be noted the constructed surface will not be displayed because the construction from point-set is time consuming.
 ...
 
 ## Workflow:
