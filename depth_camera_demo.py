@@ -3,28 +3,28 @@ import cv2 as cv
 import time
 import depth_reconstruction
 
-cap = cv.VideoCapture(0)
+cap = cv.VideoCapture(1)
 fps = cap.get(cv.CAP_PROP_FPS)
 video_w, video_h = int(cap.get(cv.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
 
 # crop settings
 cnt = [int(video_w/2),int(video_h/2)]
-crop_px = 160
-crop_py = 160
+crop_px = 320
+crop_py = 240
 crop_offset_x = 0
 crop_offset_y = 0
 cropped_limits = [[cnt[0]-crop_px+crop_offset_x,cnt[1]-crop_py+crop_offset_y],[cnt[0]+crop_px+crop_offset_x,cnt[1]+crop_py+crop_offset_y]]
 cropped_size = [2*crop_px, 2*crop_py]
 
 # camera settings
-cap.set(cv.CAP_PROP_FRAME_WIDTH, video_w)
-cap.set(cv.CAP_PROP_FRAME_HEIGHT, video_h)
-cap.set(cv.CAP_PROP_EXPOSURE, -5)
-cap.set(cv.CAP_PROP_BRIGHTNESS, 50)
-cap.set(cv.CAP_PROP_CONTRAST, 64)
-cap.set(cv.CAP_PROP_SATURATION, 50)
-cap.set(cv.CAP_PROP_HUE, 0)
-cap.set(cv.CAP_PROP_GAIN, 0)
+# cap.set(cv.CAP_PROP_FRAME_WIDTH, video_w)
+# cap.set(cv.CAP_PROP_FRAME_HEIGHT, video_h)
+# cap.set(cv.CAP_PROP_EXPOSURE, -6.5)
+# cap.set(cv.CAP_PROP_BRIGHTNESS, 64)
+# cap.set(cv.CAP_PROP_CONTRAST, 50)
+# cap.set(cv.CAP_PROP_SATURATION, 64)
+# cap.set(cv.CAP_PROP_HUE, 0)
+# cap.set(cv.CAP_PROP_GAIN, 1.0)
 # CAP_PROP_BRIGHTNESS: 0.0
 # CAP_PROP_CONTRAST: 32.0
 # CAP_PROP_SATURATION: 60.0
@@ -41,22 +41,22 @@ while True:
     time_start = time.time()
     frame_cropped = frame[cropped_limits[0][1]:cropped_limits[1][1],cropped_limits[0][0]:cropped_limits[1][0]]
 
-    my_depth = depth_reconstruction.depth('calib_08182025/background.jpg', 'lut_0818.npy', 64)
-    my_depth.get_depth_update(frame)
-    y_idx, x_idx = np.meshgrid(np.arange(my_depth.H), np.arange(my_depth.W), indexing='ij')
-    X = x_idx
-    Y = y_idx
-    Z = my_depth.depth
-    Z_reg = (((Z-Z.min())/Z.max())*255).astype(np.uint8)
-    heatmap = cv.applyColorMap(Z_reg,cv.COLORMAP_TURBO)
-    cv.imshow('Regulated depth map',heatmap)
+    # my_depth = depth_reconstruction.depth('calib_08182025/background.jpg', 'lut_0818.npy', 64)
+    # my_depth.get_depth_update(frame)
+    # y_idx, x_idx = np.meshgrid(np.arange(my_depth.H), np.arange(my_depth.W), indexing='ij')
+    # X = x_idx
+    # Y = y_idx
+    # Z = my_depth.depth
+    # Z_reg = (((Z-Z.min())/Z.max())*255).astype(np.uint8)
+    # heatmap = cv.applyColorMap(Z_reg,cv.COLORMAP_TURBO)
+    # cv.imshow('Regulated depth map',heatmap)
     cv.imshow('frame',frame_cropped)
     # if cv.waitKey(1) & 0xFF == ord('q'):
     #     break
     
     key = cv.waitKey(1)
     if key & 0xFF == ord('c'):
-        cv.imwrite(filename=f'cropped_{time.time()}.jpg',img=frame)
+        cv.imwrite(filename=f'calib_0904/cropped_{time.time()}.jpg',img=frame)
         continue
     elif key & 0xFF == ord('q'):
         break

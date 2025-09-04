@@ -69,7 +69,7 @@ def main():
     r_l = xp.clip(r_l, 0, num_bins - 1).astype(xp.int32)
 
     # load LUT
-    fancyTable_cpu = np.load("lut_0828.npy")
+    fancyTable_cpu = np.load("lut_0904.npy")
     fancyTable = cp.asarray(fancyTable_cpu) if use_gpu else fancyTable_cpu
     t0 = time.time()
     print("Lookup Table Loaded.")
@@ -100,7 +100,7 @@ def main():
     pcd.points = o3d.utility.Vector3dVector(points)
 
     # estimate normals (optional, for better rendering)
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=30))
+    # pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=30))
     t = time.time() - t0
     print(f"From begin of table lookup to open3D window created cost: {t}s")
     o3d.visualization.draw_geometries([pcd])
@@ -108,14 +108,23 @@ def main():
 
 def video():
     num_bins = 64
-    video_path = "demo_video/demo2.mp4"
+    video_path = "video/demo.mp4"
     cap = cv.VideoCapture(video_path)
-    # crop settings
     video_w, video_h = int(cap.get(cv.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    # camera settings
+    # cap.set(cv.CAP_PROP_FRAME_WIDTH, video_w)
+    # cap.set(cv.CAP_PROP_FRAME_HEIGHT, video_h)
+    # cap.set(cv.CAP_PROP_EXPOSURE, -5)
+    # cap.set(cv.CAP_PROP_BRIGHTNESS, 50)
+    # cap.set(cv.CAP_PROP_CONTRAST, 64)
+    # cap.set(cv.CAP_PROP_SATURATION, 50)
+    # cap.set(cv.CAP_PROP_HUE, 0)
+    # cap.set(cv.CAP_PROP_GAIN, 0)
+    # crop settings
     cnt = [int(video_w/2),int(video_h/2)]
-    crop_px = 400
-    crop_py = 300
-    crop_offset_x = -80
+    crop_px = 320
+    crop_py = 240
+    crop_offset_x = 0
     crop_offset_y = 0
     cropped_limits = [[cnt[0]-crop_px+crop_offset_x,cnt[1]-crop_py+crop_offset_y],[cnt[0]+crop_px+crop_offset_x,cnt[1]+crop_py+crop_offset_y]]
     cropped_size = [2*crop_px, 2*crop_py]
@@ -133,7 +142,7 @@ def video():
         vis.add_geometry(geometry)
         vis.reset_view_point(True)
         # load LUT
-        fancyTable_cpu = np.load("lut_0828.npy")
+        fancyTable_cpu = np.load("lut_0904.npy")
         fancyTable = cp.asarray(fancyTable_cpu) if use_gpu else fancyTable_cpu
         print("Lookup Table Loaded.")
         W, H = cropped_size
@@ -179,11 +188,11 @@ def video():
 
             # update Open3D point cloud
             geometry.points = o3d.utility.Vector3dVector(points)
-            vis.clear_geometries()
-            vis.add_geometry(geometry)
-            vis.poll_events()
-            vis.update_renderer()
-            # o3d.visualization.draw_geometries([geometry])
+            # vis.clear_geometries()
+            # vis.add_geometry(geometry)
+            # vis.poll_events()
+            # vis.update_renderer()
+            o3d.visualization.draw_geometries([geometry])
         frame_count+=1
         time.sleep(0.0001)
         frame_cropped = cv.putText(frame_cropped,f'FPS = {1/(time.time()-t0)}',(50,50),cv.FONT_HERSHEY_SIMPLEX,2,(0,255,255),1,cv.LINE_AA)
@@ -197,7 +206,7 @@ def video():
 
 
 if __name__ == "__main__":
-    video()
+    main()
 
 '''
 import numpy as np
