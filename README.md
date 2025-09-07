@@ -17,6 +17,7 @@ You can run `lookup.py` to display the constructed surface, provided the lookup 
 
 **update**: Now you can run `lookup_cuda.py` for faster reconstruction. This script will load the lookup table into GPU memory, and lookup operation will be interpreted as CUDA operation. To use this script, you need to install `open3D` lib with correct CUDA version. We tried this script on our homemade sensor, it can run as fast as ~80 FPS at 480x480 resulotion.
 ...
+![DSC01474](https://github.com/user-attachments/assets/196ff60a-9c2c-4038-ad6b-4393ed45c9a6)
 
 
 <img width="1297" height="869" alt="image" src="https://github.com/user-attachments/assets/2e79fdd1-e242-49a4-bffb-2cb8c5807fd0" />
