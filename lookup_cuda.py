@@ -109,22 +109,24 @@ def main():
 def video():
     num_bins = 64
     video_path = "video/demo.mp4"
-    cap = cv.VideoCapture(video_path)
+    cap = cv.VideoCapture(0)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
     video_w, video_h = int(cap.get(cv.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
     # camera settings
     # cap.set(cv.CAP_PROP_FRAME_WIDTH, video_w)
     # cap.set(cv.CAP_PROP_FRAME_HEIGHT, video_h)
-    # cap.set(cv.CAP_PROP_EXPOSURE, -5)
-    # cap.set(cv.CAP_PROP_BRIGHTNESS, 50)
-    # cap.set(cv.CAP_PROP_CONTRAST, 64)
-    # cap.set(cv.CAP_PROP_SATURATION, 50)
-    # cap.set(cv.CAP_PROP_HUE, 0)
-    # cap.set(cv.CAP_PROP_GAIN, 0)
+    cap.set(cv.CAP_PROP_EXPOSURE, -6.4)
+    cap.set(cv.CAP_PROP_BRIGHTNESS, 50)
+    cap.set(cv.CAP_PROP_CONTRAST, 64)
+    cap.set(cv.CAP_PROP_SATURATION, 50)
+    cap.set(cv.CAP_PROP_HUE, 0)
+    cap.set(cv.CAP_PROP_GAIN, 0)
     # crop settings
     cnt = [int(video_w/2),int(video_h/2)]
-    crop_px = 320
+    crop_px = 280
     crop_py = 240
-    crop_offset_x = 0
+    crop_offset_x = -30
     crop_offset_y = 0
     cropped_limits = [[cnt[0]-crop_px+crop_offset_x,cnt[1]-crop_py+crop_offset_y],[cnt[0]+crop_px+crop_offset_x,cnt[1]+crop_py+crop_offset_y]]
     cropped_size = [2*crop_px, 2*crop_py]
@@ -141,6 +143,7 @@ def video():
         geometry = o3d.geometry.PointCloud()
         vis.add_geometry(geometry)
         vis.reset_view_point(True)
+        # ctr = vis.get_view_control()
         # load LUT
         fancyTable_cpu = np.load("lut_0904.npy")
         fancyTable = cp.asarray(fancyTable_cpu) if use_gpu else fancyTable_cpu
@@ -155,12 +158,12 @@ def video():
             break
         t0 = time.time()
         frame_cropped = frame[cropped_limits[0][1]:cropped_limits[1][1],cropped_limits[0][0]:cropped_limits[1][0]]
-        if frame_count == 0:
+        if frame_count == 10: # waiting for stablization
             init_frame = frame_cropped
-            vis.reset_view_point(True)
-        if frame_count >=1 :
+            # vis.reset_view_point(True)
+        if frame_count >=10 :
             # --- Table lookup ---
-            frame_diff = frame_cropped - init_frame
+            frame_diff = np.int16(frame_cropped) - np.int16(init_frame)
             if use_gpu:
                 im_diff = cp.asarray(frame_diff)
             else:
@@ -188,15 +191,19 @@ def video():
 
             # update Open3D point cloud
             geometry.points = o3d.utility.Vector3dVector(points)
-            # vis.clear_geometries()
-            # vis.add_geometry(geometry)
-            # vis.poll_events()
-            # vis.update_renderer()
-            o3d.visualization.draw_geometries([geometry])
+            vis.clear_geometries()
+            vis.add_geometry(geometry, True)
+            vis.update_renderer()
+            vis.get_view_control().set_front([ 0, -0.97, 0.24 ])
+            vis.get_view_control().set_up([ 0, 0.24, 0.97 ])
+            vis.poll_events()
+            
+            # o3d.visualization.draw_geometries([geometry])
         frame_count+=1
         time.sleep(0.0001)
-        frame_cropped = cv.putText(frame_cropped,f'FPS = {1/(time.time()-t0)}',(50,50),cv.FONT_HERSHEY_SIMPLEX,2,(0,255,255),1,cv.LINE_AA)
-        cv.imshow("original input",frame_cropped)
+        frame_show = cv.flip(frame_cropped,flipCode=0)
+        frame_show = cv.putText(frame_show,f'FPS = {1/(time.time()-t0)}',(0,25),cv.FONT_HERSHEY_SIMPLEX,0.5,(0,255,255),1,cv.LINE_AA)
+        cv.imshow("original input",frame_show)
         key = cv.waitKey(1)
         if key & 0xFF == ord('q'):
             break
@@ -206,40 +213,26 @@ def video():
 
 
 if __name__ == "__main__":
-    main()
+    video()
 
 '''
-import numpy as np
-import open3d as o3d
-import cv2 as cv
-
-# --- create Open3D visualizer window ---
-vis = o3d.visualization.Visualizer()
-vis.create_window("Point Cloud Stream", width=960, height=540)
-pcd = o3d.geometry.PointCloud()
-vis.add_geometry(pcd)
-
-# open video
-cap = cv.VideoCapture("your_video.mp4")
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    # --- replace this with your reconstruction pipeline ---
-    H, W, _ = frame.shape
-    Z = np.random.rand(H, W) * 50  # fake depth for demo
-    X, Y = np.meshgrid(np.arange(W), np.arange(H))
-    points = np.stack((X, Y, Z), axis=-1).reshape(-1, 3)
-
-    # update Open3D point cloud
-    pcd.points = o3d.utility.Vector3dVector(points)
-    vis.update_geometry(pcd)
-    vis.poll_events()
-    vis.update_renderer()
-
-cap.release()
-vis.destroy_window()
-
+{
+	"class_name" : "ViewTrajectory",
+	"interval" : 29,
+	"is_loop" : false,
+	"trajectory" : 
+	[
+		{
+			"boundingbox_max" : [ 1299.0, 999.0, 27.308139280173652 ],
+			"boundingbox_min" : [ 0.0, 0.0, -9.8793729006256115 ],
+			"field_of_view" : 60.0,
+			"front" : [ -0.016418874082577386, -0.97028873997977227, 0.24139217394589785 ],
+			"lookat" : [ 649.5, 499.5, 8.7143831897740203 ],
+			"up" : [ -0.0037924473439299995, 0.24148341502378576, 0.97039753586434541 ],
+			"zoom" : 0.69999999999999996
+		}
+	],
+	"version_major" : 1,
+	"version_minor" : 0
+}
 '''
