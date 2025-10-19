@@ -10,6 +10,8 @@ First, clone this repo and install required packages:
 ```
 pip install -r requirements.txt
 ```
+>**update**: To use `lookup_cuda.py`, make sure your graphics card supports CUDA and CUDA Toolkit installed on your machine. If you use conda vitrual env, please install cuda tools and cupy for conda, otherwise the script won't work, please follow [this instruction](https://docs.cupy.dev/en/stable/install.html) to install cupy correctly.
+
 Then run `calib.py` , place the ball, and apply indent force to produce images for sensor calibration. You should adjust calibration parameters(the ball radius, pixel-to-mm rate) before this step. This calibration process will produce a `.npz` lookup table. This script would ask user for manually circle search, with (`I`, `J`, `K`, `L` for coarse movement, `W`, `A`, `S` and `D` for fine movement) to adjust the location of center and (`M` and `N`) to increase/decrease the radius of lookup circle. Once circle search is finished, the pixels within the circle range will be extracted in (R, G, B) pair and assigned to a gradient value evaluated from geometry parameters.
 
 
