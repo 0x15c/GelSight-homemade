@@ -10,7 +10,6 @@ First, clone this repo and install required packages:
 ```
 pip install -r requirements.txt
 ```
->**update**: To use `lookup_cuda.py`, make sure your graphics card supports CUDA and CUDA Toolkit installed on your machine. If you use conda vitrual env, please install cuda tools and cupy for conda, otherwise the script won't work, please follow [this instruction](https://docs.cupy.dev/en/stable/install.html) to install cupy correctly.
 
 Then run `calib.py` , place the ball, and apply indent force to produce images for sensor calibration. You should adjust calibration parameters(the ball radius, pixel-to-mm rate) before this step. This calibration process will produce a `.npz` lookup table. This script would ask user for manually circle search, with (`I`, `J`, `K`, `L` for coarse movement, `W`, `A`, `S` and `D` for fine movement) to adjust the location of center and (`M` and `N`) to increase/decrease the radius of lookup circle. Once circle search is finished, the pixels within the circle range will be extracted in (R, G, B) pair and assigned to a gradient value evaluated from geometry parameters.
 
@@ -18,6 +17,10 @@ Then run `calib.py` , place the ball, and apply indent force to produce images f
 You can run `lookup.py` to display the constructed surface, provided the lookup table, the background image and the image you want to extract depth from are presented. You can run `depth_camera_demo.py` to see the depth reconstruction in real time, but please be noted the constructed surface will not be displayed because the construction from point-set is time consuming.
 
 **update**: Now you can run `lookup_cuda.py` for faster reconstruction. This script will load the lookup table into GPU memory, and lookup operation will be interpreted as CUDA operation. To use this script, you need to install `open3D` lib with correct CUDA version. We tried this script on our homemade sensor, it can run as fast as ~80 FPS at 480x480 resulotion.
+
+>**important notes**: To use `lookup_cuda.py`, make sure your graphics card supports CUDA and CUDA Toolkit installed on your machine. If you use conda vitrual env, please install cuda tools and cupy for conda, otherwise the script won't work, please follow [this instruction](https://docs.cupy.dev/en/stable/install.html) to install cupy correctly.
+
+
 ...
 ![DSC01474](https://github.com/user-attachments/assets/196ff60a-9c2c-4038-ad6b-4393ed45c9a6)
 
