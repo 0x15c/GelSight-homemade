@@ -21,7 +21,9 @@ You can run `lookup.py` to display the constructed surface, provided the lookup 
 >**important notes**: To use `lookup_cuda.py`, make sure your graphics card supports CUDA and CUDA Toolkit installed on your machine. If you use conda vitrual env, please install cuda tools and cupy for conda, otherwise the script won't work, please follow [this instruction](https://docs.cupy.dev/en/stable/install.html) to install cupy correctly.
 
 
-...
+## Tracking the deformation with dots
+We are trying U-Net to make a mask for the tracking dots, it can only run ~4FPS under 1920x1080 resulotion. Please refer to [this repo](https://github.com/milesial/Pytorch-UNet) for the training script. We also make a dataset for the training, will upload soon.
+
 ![DSC01474](https://github.com/user-attachments/assets/196ff60a-9c2c-4038-ad6b-4393ed45c9a6)
 
 
