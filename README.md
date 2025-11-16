@@ -1,9 +1,9 @@
-# GelSight-homemade
-A homemade version of MIT gelsight, with classic gradient reconstruction.
+# D-Sight homemade
+A homemade version of MIT gelsight, with classic gradient reconstruction. We add tracking dots to reconstruct contact forces.
 
 Gelsight is a visual tactile sensor used for surface reconstruction, which was introduced by MIT in their [CVPR paper](https://doi.org/10.1109/CVPR.2009.5206534). Our code is similar to [this repo](https://github.com/siyuandong16/gelsight_heightmap_reconstruction), but with more verbose comments and different code structure. We aim at achieving online depth reconstruction & recording, these real-time sensing data can be interpreted and learned as an immediate tactile feedback, with abundant knowledge on objects the sensor touched.
 
-Test image source: [gelsight_heightmap_reconstruction](https://github.com/siyuandong16/gelsight_heightmap_reconstruction). We will collect own data from our sensor soon.
+Test image source: [gelsight_heightmap_reconstruction](https://github.com/siyuandong16/gelsight_heightmap_reconstruction). We have collected data for our sensor and built corresponding lookup table.
 
 ## How to use it
 First, clone this repo and install required packages:
