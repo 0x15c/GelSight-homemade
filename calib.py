@@ -340,10 +340,10 @@ def bin_table(grad_data_list, num_bins = 64):
     return fancyTable
 if __name__ == '__main__':
     param = Calib_param(10.0/2,1460/34)
-    ref = cv.imread('calib_0904/bg/bg.jpg')
+    ref = cv.imread('calib_0921/bg/bg.jpg')
     # im_ball = cv.imread('test_data/sample_8.jpg')
     # img_remove_background = diff_image(ref,im_ball)
-    calib_img_file_list = sorted(glob.glob("calib_0904/*.jpg"))
+    calib_img_file_list = sorted(glob.glob("calib_0921/*.png"))
     print(calib_img_file_list)
     img_obj_list = []
     Grad_data_list = []
@@ -361,11 +361,11 @@ if __name__ == '__main__':
     # cv.waitKey(0)
     # lut_write(Grad.lut)
     col_name=['b','g','r','Gx','Gy','theta','phi']
-    lut_file_name = 'lut_matlab_0904.csv'
+    lut_file_name = 'lut_matlab.csv'
     df = pd.DataFrame(columns=col_name) # make title
     df.to_csv(lut_file_name, index=False)
     for item in Grad_data_list:
         df = pd.DataFrame(item.lut)
         df.to_csv(lut_file_name, mode='a',header=False,index=False,float_format='%.3f')
     fancyTable = bin_table(Grad_data_list)
-    np.save('lut_0904',fancyTable)
+    np.save('lut_0921',fancyTable)
