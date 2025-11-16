@@ -2,3 +2,11 @@
 .vscode
 test_data
 *.csv
+U_Net_dataset2
+videoTracking
+stubs
+yolo_test
+minitest_ds
+data_calibration_archive
+carvana_dataset
+__pycache__
